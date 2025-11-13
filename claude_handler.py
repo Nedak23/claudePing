@@ -5,8 +5,6 @@ import subprocess
 import os
 import logging
 from typing import Tuple, Optional
-import tempfile
-import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -42,38 +40,28 @@ class ClaudeHandler:
             Tuple of (success, response_text, error_message)
         """
         try:
-            # Create a temporary file with the prompt
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-                f.write(prompt)
-                prompt_file = f.name
+            # Run Claude Code with the prompt
+            # Using -p flag to pass prompt directly
+            result = subprocess.run(
+                ['claude', '-p', prompt],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env=os.environ.copy()
+            )
 
-            try:
-                # Run Claude Code with the prompt
-                # Using non-interactive mode to get a single response
-                result = subprocess.run(
-                    ['claude', '-p', prompt],
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                    env=os.environ.copy()
-                )
+            if result.returncode == 0:
+                response = result.stdout.strip()
+                logger.info(f"Claude response received ({len(response)} chars)")
+                return True, response, None
+            else:
+                error_msg = result.stderr.strip() if result.stderr else "Unknown error"
+                logger.error(f"Claude command failed: {error_msg}")
+                return False, "", error_msg
 
-                # Clean up temp file
-                os.unlink(prompt_file)
-
-                if result.returncode == 0:
-                    response = result.stdout.strip()
-                    logger.info(f"Claude response received ({len(response)} chars)")
-                    return True, response, None
-                else:
-                    error_msg = result.stderr.strip() if result.stderr else "Unknown error"
-                    logger.error(f"Claude command failed: {error_msg}")
-                    return False, "", error_msg
-
-            except subprocess.TimeoutExpired:
-                os.unlink(prompt_file)
-                logger.error(f"Claude command timed out after {timeout}s")
-                return False, "", f"Request timed out after {timeout} seconds"
+        except subprocess.TimeoutExpired:
+            logger.error(f"Claude command timed out after {timeout}s")
+            return False, "", f"Request timed out after {timeout} seconds"
 
         except Exception as e:
             logger.error(f"Error running Claude: {str(e)}")
