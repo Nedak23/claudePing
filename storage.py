@@ -137,8 +137,8 @@ class SessionStorage:
 
     def get_session_file(self, phone_number: str) -> str:
         """Get the session file path for a phone number."""
-        # Sanitize phone number for filename
-        safe_number = phone_number.replace('+', '').replace('-', '')
+        # Sanitize phone number for filename (handle WhatsApp format)
+        safe_number = phone_number.replace('whatsapp:', '').replace('+', '').replace('-', '').replace(':', '')
         return os.path.join(self.storage_dir, f"{safe_number}.json")
 
     def get_session(self, phone_number: str) -> Dict[str, Any]:

@@ -1,6 +1,6 @@
 """
 Flask application for Text-Based Coding Companion.
-Receives SMS via Twilio webhook and interacts with Claude Code CLI.
+Receives messages via Twilio (WhatsApp or SMS) and interacts with Claude Code CLI.
 """
 import os
 from flask import Flask, request, jsonify
@@ -51,6 +51,7 @@ except Exception as e:
 def is_whitelisted(phone_number: str) -> bool:
     """
     Check if a phone number is whitelisted.
+    Handles both SMS format (+1234567890) and WhatsApp format (whatsapp:+1234567890).
 
     Args:
         phone_number: Phone number to check
@@ -58,9 +59,14 @@ def is_whitelisted(phone_number: str) -> bool:
     Returns:
         True if whitelisted, False otherwise
     """
+    # Remove whatsapp: prefix if present
+    clean_number = phone_number.replace('whatsapp:', '').strip()
+
     whitelist = os.getenv('WHITELISTED_NUMBERS', '').split(',')
     whitelist = [num.strip() for num in whitelist]
-    return phone_number in whitelist
+
+    # Check both with and without whatsapp: prefix
+    return clean_number in whitelist or phone_number in whitelist
 
 
 def process_command(command: str, phone_number: str) -> str:
@@ -197,14 +203,16 @@ def handle_coding_request(message: str, phone_number: str) -> str:
 @app.route('/sms', methods=['POST'])
 def sms_webhook():
     """
-    Twilio webhook endpoint for incoming SMS messages.
+    Twilio webhook endpoint for incoming messages (SMS or WhatsApp).
     """
     try:
         # Get the incoming message details
         from_number = request.form.get('From')
         message_body = request.form.get('Body', '').strip()
 
-        logger.info(f"Received SMS from {from_number}: {message_body[:50]}...")
+        # Determine message type
+        message_type = "WhatsApp" if from_number and from_number.startswith('whatsapp:') else "SMS"
+        logger.info(f"Received {message_type} from {from_number}: {message_body[:50]}...")
 
         # Create Twilio response
         resp = MessagingResponse()
@@ -280,8 +288,9 @@ def index():
         'service': 'Text-Based Coding Companion',
         'version': '1.0.0',
         'status': 'running',
+        'messaging': 'WhatsApp and SMS supported',
         'endpoints': {
-            'sms_webhook': '/sms',
+            'webhook': '/sms (handles both WhatsApp and SMS)',
             'get_response': '/response/<id>',
             'health': '/health'
         }

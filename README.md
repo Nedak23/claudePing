@@ -1,168 +1,92 @@
 # Text-Based Coding Companion
 
-A tool that lets you interact with Claude Code via text messages. Send coding requests via SMS and get AI-powered coding assistance on the go, with automatic branch creation and GitHub integration.
+A tool that lets you interact with Claude Code via **WhatsApp** or SMS. Send coding requests from your phone and get AI-powered coding assistance on the go, with automatic branch creation and GitHub integration.
+
+## ⚡ Quick Start
+
+**Recommended:** Use WhatsApp (FREE, no phone number needed!)
+
+👉 **[Follow the WhatsApp Setup Guide](WHATSAPP_SETUP.md)** ← Start here!
 
 ## Features
 
-- 📱 **SMS Interface**: Send coding requests via text message
+- 💬 **WhatsApp Interface**: Send coding requests via WhatsApp (recommended - FREE!)
+- 📱 **SMS Alternative**: Also supports traditional SMS (requires A2P compliance)
 - 🤖 **Claude Code Integration**: Leverages Claude Code CLI for intelligent coding assistance
 - 🌿 **Auto Branch Creation**: Automatically creates Git branches for code changes
 - 💾 **Response Storage**: Full responses stored and accessible via web link
 - 📊 **Session Management**: Maintains conversation context across messages
 - 🔒 **Phone Whitelist**: Security through phone number authorization
 
+## Why WhatsApp?
+
+✅ **FREE** - Twilio WhatsApp Sandbox is free forever
+✅ **No A2P Compliance** - Skip the business registration
+✅ **Instant Setup** - Ready in 20 minutes
+✅ **No Phone Number Costs** - Twilio provides sandbox number
+✅ **Works Worldwide** - No international SMS fees
+
 ## Architecture
 
 ```
-[Your Phone]
-    ↓ SMS
-[Twilio]
-    ↓ Webhook
-[Flask Server]
+[Your Phone - WhatsApp]
+    ↓
+[Twilio WhatsApp Sandbox]
+    ↓ Webhook (HTTPS)
+[Flask Server (Local)]
     ↓
 [Claude Code CLI] → [Git/GitHub]
     ↓
-[Summary via SMS]
+[Response via WhatsApp]
 ```
 
 ## Prerequisites
 
 1. **Python 3.8+**
 2. **Claude Code CLI** - Install from [Anthropic](https://docs.anthropic.com)
-3. **Twilio Account** - For SMS functionality
-4. **Git Repository** - For code change management
-5. **ngrok** (for local development) - To expose local server to Twilio
+3. **Twilio Account** - For WhatsApp (FREE sandbox)
+4. **WhatsApp** - On your phone
+5. **Git Repository** - For code change management
+6. **ngrok** (for local development) - To expose local server to Twilio
 
-## Installation
+## Setup Guides
 
-### 1. Clone the Repository
+Choose your preferred messaging method:
 
-```bash
-git clone <your-repo-url>
-cd claudePing
-```
+### 🌟 WhatsApp Setup (Recommended)
 
-### 2. Create Virtual Environment
+**👉 [Complete WhatsApp Setup Guide](WHATSAPP_SETUP.md)**
 
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+- ✅ FREE forever (Twilio sandbox)
+- ✅ No A2P compliance needed
+- ✅ Setup time: 20-30 minutes
+- ✅ Perfect for personal use
 
-### 3. Install Dependencies
+### 📱 SMS Setup (Alternative)
 
-```bash
-pip install -r requirements.txt
-```
+**👉 [SMS Setup Guide](SETUP_GUIDE.md)**
 
-### 4. Install Claude Code CLI
+- ⚠️ Requires A2P 10DLC compliance
+- ⚠️ Business registration needed
+- ⚠️ Costs: $1-3/month + message fees
+- ⚠️ Setup time: 30-45 minutes + approval wait
 
-Follow the official installation instructions at [Anthropic Claude Code](https://docs.anthropic.com).
+**Note:** For personal use, WhatsApp is strongly recommended!
 
-Verify installation:
-```bash
-claude --version
-```
+## Usage Examples
 
-### 5. Set Up Twilio
+Once set up (follow the guides above), you can send messages like:
 
-1. **Create a Twilio Account**: Go to [twilio.com](https://www.twilio.com/try-twilio)
-2. **Get a Phone Number**:
-   - Navigate to Phone Numbers → Buy a Number
-   - Choose a number with SMS capabilities
-3. **Get Your Credentials**:
-   - Account SID: Found on your Twilio Console Dashboard
-   - Auth Token: Found on your Twilio Console Dashboard
-
-### 6. Configure Environment Variables
-
-Copy the example environment file:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your credentials:
-
-```env
-# Twilio Configuration
-TWILIO_ACCOUNT_SID=your_account_sid_here
-TWILIO_AUTH_TOKEN=your_auth_token_here
-TWILIO_PHONE_NUMBER=+1234567890
-
-# Whitelisted phone numbers (comma-separated)
-WHITELISTED_NUMBERS=+1234567890,+0987654321
-
-# Claude API Key
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
-
-# GitHub Token (optional, for private repos)
-GITHUB_TOKEN=your_github_token_here
-
-# Server Configuration
-SERVER_PORT=5000
-SERVER_HOST=0.0.0.0
-BASE_URL=http://localhost:5000
-```
-
-**Important**:
-- Replace `your_account_sid_here` and `your_auth_token_here` with your actual Twilio credentials
-- Add your phone number to `WHITELISTED_NUMBERS`
-- Get your Anthropic API key from [Anthropic Console](https://console.anthropic.com/)
-
-### 7. Set Up ngrok (for Local Development)
-
-1. **Install ngrok**: Download from [ngrok.com](https://ngrok.com/download)
-
-2. **Start ngrok**:
-   ```bash
-   ngrok http 5000
-   ```
-
-3. **Copy the HTTPS URL** (e.g., `https://abc123.ngrok.io`)
-
-4. **Update `.env`**:
-   ```env
-   BASE_URL=https://abc123.ngrok.io
-   ```
-
-5. **Configure Twilio Webhook**:
-   - Go to Twilio Console → Phone Numbers → Your Number
-   - Under "Messaging", set "A MESSAGE COMES IN" to:
-     ```
-     https://abc123.ngrok.io/sms
-     ```
-   - Set method to `HTTP POST`
-   - Save
-
-## Usage
-
-### Starting the Server
-
-```bash
-python app.py
-```
-
-You should see:
-```
-Starting server on 0.0.0.0:5000
-Press Ctrl+C to stop
-```
-
-### Sending SMS Commands
-
-Once the server is running and Twilio is configured, you can text your Twilio number:
-
-#### Regular Coding Request
+### Regular Coding Request
 ```
 Create a Python function to calculate fibonacci numbers
 ```
 
-Response:
+**Response:**
 ```
-✓ Done! Modified 1 file. Branch: sms/20231115_143022.
+✓ Done! Modified 1 file. Branch: sms/20241115_143022.
 Summary: Created fibonacci function with memoization...
-Full: https://abc123.ngrok.io/response/20231115_143022_123456
+Full: https://your-server.com/response/20241115_143022_123456
 ```
 
 #### Special Commands
