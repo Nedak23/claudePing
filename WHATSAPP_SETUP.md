@@ -480,7 +480,7 @@ You'll see a section labeled **"When a message comes in"**
 
 2. **Method:** HTTP POST (should be selected by default)
 
-3. **Click "Save"** (red button at bottom)
+3. **Click "Save"** (button at bottom)
 
 **Example:**
 ```
