@@ -1,110 +1,206 @@
-# Text-Based Coding Companion
+# ClaudePing
 
-A tool that lets you interact with Claude Code via **WhatsApp** or SMS. Send coding requests from your phone and get AI-powered coding assistance on the go, with automatic branch creation and GitHub integration.
+Send coding requests via **WhatsApp** and get AI-powered assistance from Claude on the go, with automatic Git branch creation and GitHub integration.
 
-## ⚡ Quick Start
+## Setup
 
-**Recommended:** Use WhatsApp (FREE, no phone number needed!)
+### Prerequisites
 
-👉 **[Follow the WhatsApp Setup Guide](WHATSAPP_SETUP.md)** ← Start here!
+- **Python 3.8+**
+- **Claude Code CLI** - [Install guide](https://docs.anthropic.com)
+- **Twilio Account** - For WhatsApp (free trial)
+- **Git & GitHub** - For code management
+- **ngrok** - For local development
 
-## Features
+### Step-by-Step Setup
 
-- 💬 **WhatsApp Interface**: Send coding requests via WhatsApp (recommended - FREE!)
-- 📱 **SMS Alternative**: Also supports traditional SMS (requires A2P compliance)
-- 🤖 **Claude Code Integration**: Leverages Claude Code CLI for intelligent coding assistance
-- 🌿 **Auto Branch Creation**: Automatically creates Git branches for code changes
-- 💾 **Response Storage**: Full responses stored and accessible via web link
-- 📊 **Session Management**: Maintains conversation context across messages
-- 🔒 **Phone Whitelist**: Security through phone number authorization
+#### 1. Create Twilio Account
 
-## Why WhatsApp?
+1. Go to https://www.twilio.com/try-twilio
+2. Sign up and verify your phone number
 
-✅ **FREE** - Twilio WhatsApp Sandbox is free forever
-✅ **No A2P Compliance** - Skip the business registration
-✅ **Instant Setup** - Ready in 20 minutes
-✅ **No Phone Number Costs** - Twilio provides sandbox number
-✅ **Works Worldwide** - No international SMS fees
+#### 2. Join WhatsApp Sandbox
 
-## Architecture
+1. In Twilio Console: **Messaging → Try it out → Send a WhatsApp message**
+2. Note the sandbox number (e.g., +1 415-523-8886)
+3. Open WhatsApp on your phone
+4. Send the join code to the sandbox number (displayed on page)
+5. Wait for confirmation: "✅ You are all set!"
 
+#### 3. Get Twilio Credentials
+
+From Twilio Console dashboard, copy:
+- **Account SID** (starts with "AC")
+- **Auth Token** (click "Show" to reveal)
+
+#### 4. Get Anthropic API Key
+
+1. Go to https://console.anthropic.com/
+2. Sign up/login and add payment method
+3. **Settings → API Keys → Create Key**
+4. Copy the key immediately (starts with "sk-ant-")
+
+#### 5. Install Claude Code CLI
+**Install**
+```bash
+brew install anthropics/tap/claude
 ```
-[Your Phone - WhatsApp]
-    ↓
-[Twilio WhatsApp Sandbox]
-    ↓ Webhook (HTTPS)
-[Flask Server (Local)]
-    ↓
-[Claude Code CLI] → [Git/GitHub]
-    ↓
-[Response via WhatsApp]
+
+**Configure:**
+```bash
+claude configure
+# Enter your Anthropic API key when prompted
 ```
 
-## Prerequisites
+**Verify:**
+```bash
+claude --version
+```
 
-1. **Python 3.8+**
-2. **Claude Code CLI** - Install from [Anthropic](https://docs.anthropic.com)
-3. **Twilio Account** - For WhatsApp (FREE sandbox)
-4. **WhatsApp** - On your phone
-5. **Git Repository** - For code change management
-6. **ngrok** (for local development) - To expose local server to Twilio
+#### 6. Setup Project
 
-## Setup Guides
+```bash
+# Clone repository
+git clone <your-repo-url>
+cd claudePing
 
-Choose your preferred messaging method:
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
 
-### 🌟 WhatsApp Setup (Recommended)
+# Install dependencies
+pip install -r requirements.txt
 
-**👉 [Complete WhatsApp Setup Guide](WHATSAPP_SETUP.md)**
+# Create environment file
+cp .env.example .env
+```
 
-- ✅ FREE forever (Twilio sandbox)
-- ✅ No A2P compliance needed
-- ✅ Setup time: 20-30 minutes
-- ✅ Perfect for personal use
+#### 7. Configure `.env`
 
-### 📱 SMS Setup (Alternative)
+Edit `.env` with your credentials:
 
-**👉 [SMS Setup Guide](SETUP_GUIDE.md)**
+```env
+# Twilio Configuration
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_auth_token_here
 
-- ⚠️ Requires A2P 10DLC compliance
-- ⚠️ Business registration needed
-- ⚠️ Costs: $1-3/month + message fees
-- ⚠️ Setup time: 30-45 minutes + approval wait
+# WhatsApp - leave blank for sandbox
+TWILIO_PHONE_NUMBER=
 
-**Note:** For personal use, WhatsApp is strongly recommended!
+# Your phone number (include country code, no spaces)
+WHITELISTED_NUMBERS=+1234567890
 
-## Usage Examples
+# Claude API
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxx
 
-Once set up (follow the guides above), you can send messages like:
+# GitHub (optional)
+GITHUB_TOKEN=
 
-### Regular Coding Request
+# Server Config (defaults are fine)
+SERVER_PORT=8000
+SERVER_HOST=0.0.0.0
+BASE_URL=http://localhost:8000
+```
+
+**Important:**
+- Use YOUR phone number for `WHITELISTED_NUMBERS` (the one you verified)
+- Include country code (e.g., +1 for US)
+
+#### 8. Install & Configure ngrok
+
+**Mac:**
+```bash
+brew install ngrok
+```
+
+**Setup ngrok account:**
+1. Go to https://ngrok.com/ and sign up (free)
+2. Copy your auth token from https://dashboard.ngrok.com/get-started/your-authtoken
+3. Configure: `ngrok config add-authtoken YOUR_TOKEN_HERE`
+
+#### 9. Start Servers
+
+**Terminal 1 - Flask Server:**
+```bash
+cd claudePing
+source venv/bin/activate
+python app.py
+```
+
+**Terminal 2 - ngrok:**
+```bash
+ngrok http 5000
+```
+
+Copy the **HTTPS forwarding URL** from ngrok (e.g., `https://abcd-1234.ngrok-free.app`)
+
+#### 10. Configure Webhook
+
+1. Edit `.env` and update `BASE_URL` with your ngrok URL
+2. Go to Twilio Console: **Messaging → Try it out → Send a WhatsApp message**
+3. Scroll to "Sandbox Configuration"
+4. In "When a message comes in": Enter `https://your-ngrok-url.ngrok-free.app/sms`
+5. Method: **HTTP POST**
+6. Click **Save**
+
+**Note:** The endpoint is `/sms`
+
+#### 11. Test It! 🎉
+
+Send a WhatsApp message to the sandbox number:
+```
+Create a Python function that adds two numbers
+```
+
+You should receive a response within 30-60 seconds with:
+- A summary of what was done
+- Branch name created
+- Link to full response
+
+**Success!** You're now coding via WhatsApp! 🚀
+
+---
+
+## Usage
+
+### Send Coding Requests
+
+Just message naturally in WhatsApp:
+
 ```
 Create a Python function to calculate fibonacci numbers
 ```
 
-**Response:**
+```
+Add error handling to the add_numbers function
+```
+
+```
+Write unit tests for my authentication module
+```
+
+```
+Refactor the database connection to use connection pooling
+```
+
+### Response Format
+
+You'll receive:
 ```
 ✓ Done! Modified 1 file. Branch: sms/20241115_143022.
 Summary: Created fibonacci function with memoization...
 Full: https://your-server.com/response/20241115_143022_123456
 ```
 
-#### Special Commands
+### Special Commands
 
-**Start New Session**:
-```
-NEW SESSION
-```
+ClaudePing supports special commands for session management:
 
-**Check Status**:
-```
-STATUS
-```
+- `NEW SESSION` - Start fresh conversation
+- `STATUS` - Check current session info
+- `FULL <id>` - Get complete response
 
-**Get Full Response** (if summary was truncated):
-```
-FULL 20231115_143022_123456
-```
+**[View Complete Commands Guide →](COMMANDS.md)**
 
 ## Project Structure
 
@@ -114,187 +210,75 @@ claudePing/
 ├── claude_handler.py       # Claude Code CLI integration
 ├── git_handler.py          # Git operations (branch, commit, push)
 ├── storage.py              # Response and session storage
-├── summary_generator.py    # SMS summary generation
+├── summary_generator.py    # Message summary generation
 ├── requirements.txt        # Python dependencies
 ├── .env                    # Environment variables (create from .env.example)
-├── .env.example           # Environment template
-├── .gitignore             # Git ignore rules
-├── responses/             # Stored full responses (JSON)
-├── sessions/              # User session data
+├── README.md               # This file
+├── COMMANDS.md             # Complete commands reference
+├── responses/              # Stored full responses (JSON)
+├── sessions/               # User session data
 └── tests/
-    └── test_local.py      # Local testing utilities
+    └── test_local.py       # Local testing utilities
 ```
 
-## How It Works
+### Adding Multiple Users
 
-1. **Receive SMS**: Twilio forwards incoming SMS to `/sms` webhook
-2. **Validate**: Check if phone number is whitelisted
-3. **Process Command**: Check for special commands (NEW SESSION, STATUS, etc.)
-4. **Send to Claude**: Forward request to Claude Code CLI
-5. **Git Operations**:
-   - Detect file changes
-   - Create new branch (`sms/timestamp`)
-   - Commit changes
-   - Push to GitHub
-6. **Store Response**: Save full response with metadata
-7. **Generate Summary**: Create concise SMS-friendly summary
-8. **Send SMS**: Reply with summary and link to full response
-
-## Configuration
-
-### Whitelist Management
-
-Add phone numbers to `.env`:
+Add multiple phone numbers to `.env`:
 ```env
 WHITELISTED_NUMBERS=+12345678901,+10987654321,+15555555555
 ```
 
+Each person must:
+1. Join the Twilio WhatsApp sandbox (send join code)
+2. Have their number added to the whitelist
+
 ### Timeout Settings
 
-Adjust Claude Code timeout in `claude_handler.py`:
+Adjust Claude timeout in `claude_handler.py`:
 ```python
 def send_prompt(self, prompt: str, timeout: int = 120):
 ```
 
 ### Summary Length
 
-Adjust summary length in `summary_generator.py`:
+Adjust in `summary_generator.py`:
 ```python
 def __init__(self, max_length: int = 150):
 ```
 
-## Testing
+---
 
-### Local Testing Without SMS
+## Daily Usage
 
-Use the test utility:
+### Starting Your Session
 
+Every time you want to use the system:
+
+**Terminal 1:**
 ```bash
-python tests/test_local.py
+cd ~/Projects/claudePing
+source venv/bin/activate
+python app.py
 ```
 
-This allows you to:
-- Test Claude Code integration
-- Test Git operations
-- Test response generation
-- All without needing SMS/Twilio
-
-### Health Check
-
-Visit `http://localhost:5000/health` to verify:
-- Server is running
-- Claude Code is installed
-- Git repository is detected
-
-## Troubleshooting
-
-### Claude Code Not Found
-```
-Error: Claude Code CLI not detected
+**Terminal 2:**
+```bash
+ngrok http 8000
 ```
 
-**Solution**: Install Claude Code CLI and ensure it's in your PATH
+### Stopping the System
 
-### Twilio Webhook Not Receiving Messages
-1. Check ngrok is running
-2. Verify webhook URL in Twilio console matches ngrok URL
-3. Check Twilio phone number is SMS-enabled
-
-### Phone Number Not Whitelisted
-```
-Sorry, your number is not authorized to use this service.
-```
-
-**Solution**: Add your phone number to `WHITELISTED_NUMBERS` in `.env`
-
-### Git Push Failed (403 Error)
-```
-Authentication failed
-```
-
-**Solution**:
-1. Set `GITHUB_TOKEN` in `.env`
-2. Ensure token has repo write permissions
-3. Verify branch name starts with `claude/` and ends with session ID
-
-### Response Timeout
-```
-Request timed out after 120 seconds
-```
-
-**Solution**: Increase timeout in `claude_handler.py` for complex requests
-
-## API Endpoints
-
-### `POST /sms`
-Twilio webhook endpoint for incoming SMS
-
-### `GET /response/<id>`
-Retrieve full response by ID
-
-**Response**:
-```json
-{
-  "id": "20231115_143022_123456",
-  "timestamp": "2023-11-15T14:30:22",
-  "prompt": "Create a Python function...",
-  "response": "Here's the function...",
-  "branch_name": "sms/20231115_143022",
-  "files_changed": ["fibonacci.py"]
-}
-```
-
-### `GET /health`
-Health check endpoint
-
-### `GET /`
-Service info and available endpoints
-
-## Security Considerations
-
-1. **Whitelist Only**: Only authorized phone numbers can use the service
-2. **API Key Protection**: Store API keys in `.env`, never commit to Git
-3. **HTTPS Only**: Use HTTPS for production (ngrok provides this)
-4. **Rate Limiting**: Consider adding rate limiting for production use
-5. **Input Validation**: All inputs are validated before processing
-
-## Limitations (MVP)
-
-- Single user (personal use)
-- Local deployment only
-- No advanced session management
-- Basic error handling
-- SMS character limits (summaries truncated)
-
-## Future Enhancements
-
-- Multi-user support with user authentication
-- Web dashboard for managing sessions
-- Advanced conversation history
-- Support for multiple repositories
-- Integration with other messaging platforms (Slack, Discord)
-- Cloud deployment (AWS Lambda, Heroku)
-- Enhanced error recovery
-- Analytics and usage tracking
+1. Press `Ctrl+C` in both terminals
+2. Deactivate venv: `deactivate`
 
 ## Contributing
 
 This is a personal MVP project. Feedback and suggestions welcome!
 
+---
+
 ## License
 
 MIT License - feel free to use and modify for your needs.
 
-## Support
-
-For issues or questions:
-1. Check the Troubleshooting section
-2. Review logs in the console
-3. Test with `test_local.py`
-4. Check Twilio webhook logs in Twilio Console
-
-## Acknowledgments
-
-- Built with [Claude Code](https://www.anthropic.com) by Anthropic
-- SMS powered by [Twilio](https://www.twilio.com)
-- Uses [Flask](https://flask.palletsprojects.com/) for web framework
+---
