@@ -105,17 +105,27 @@ class EnhancedSessionManager(SessionManager):
         repo_name = self._active_repos.get(phone_number)
 
         if repo_name:
-            return self.repo_manager.get_repository(repo_name)
+            repo = self.repo_manager.get_repository(repo_name)
+            if repo:
+                return repo
+            else:
+                # Cached repo no longer exists, clear it
+                logger.warning(f"Cached repository '{repo_name}' no longer exists for {phone_number}")
+                del self._active_repos[phone_number]
 
         # Fall back to default repository
         default_repo = self.repo_manager.get_default_repository()
         if default_repo:
             # Check access
-            is_allowed, _ = self.repo_manager.validate_access(phone_number, default_repo.name, 'read')
+            is_allowed, error_msg = self.repo_manager.validate_access(phone_number, default_repo.name, 'read')
             if is_allowed:
                 # Set as active for this user
                 self._active_repos[phone_number] = default_repo.name
+                logger.info(f"Set default repository '{default_repo.name}' as active for {phone_number}")
                 return default_repo
+            else:
+                # User doesn't have access to default repo
+                logger.warning(f"User {phone_number} doesn't have access to default repository: {error_msg}")
 
         return None
 
@@ -200,37 +210,6 @@ class EnhancedSessionManager(SessionManager):
 
         # Send message to specific repository
         return self.send_message_to_repo(phone_number, message, repo, timeout)
-
-    def get_repository_history(self, phone_number: str, limit: int = 5) -> List[str]:
-        """
-        Get user's recently used repositories.
-
-        Args:
-            phone_number: User's phone number
-            limit: Maximum number of repos to return
-
-        Returns:
-            List of repository names
-        """
-        # For now, return accessible repositories sorted by last accessed
-        repos = self.repo_manager.list_repositories(phone_number)
-        repos.sort(key=lambda r: r.last_accessed, reverse=True)
-
-        return [r.name for r in repos[:limit]]
-
-    def validate_repo_access(self, phone_number: str, repo_name: str) -> bool:
-        """
-        Check if user has access to a repository.
-
-        Args:
-            phone_number: User's phone number
-            repo_name: Repository name
-
-        Returns:
-            True if user has access
-        """
-        is_allowed, _ = self.repo_manager.validate_access(phone_number, repo_name, 'read')
-        return is_allowed
 
     def list_accessible_repositories(self, phone_number: str) -> List[Repository]:
         """

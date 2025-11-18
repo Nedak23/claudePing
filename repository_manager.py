@@ -7,7 +7,6 @@ from dataclasses import dataclass, asdict
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 import logging
-from pathlib import Path
 
 from git_handler import GitHandler
 
@@ -49,6 +48,11 @@ class Repository:
         """
         Check if user has specific permission for this repo.
 
+        Permission hierarchy: admin > write > read
+        - 'admin' grants all permissions
+        - 'write' grants write and read
+        - 'read' grants only read
+
         Args:
             phone_number: User's phone number
             permission: Permission to check ('read', 'write', 'admin')
@@ -57,7 +61,20 @@ class Repository:
             True if user has permission
         """
         user_permissions = self.access_control.get(phone_number, [])
-        return permission in user_permissions
+
+        # Direct permission check
+        if permission in user_permissions:
+            return True
+
+        # Hierarchical permission checks
+        if permission == 'read':
+            # write or admin grants read access
+            return 'write' in user_permissions or 'admin' in user_permissions
+        elif permission == 'write':
+            # admin grants write access
+            return 'admin' in user_permissions
+
+        return False
 
     def update_last_accessed(self):
         """Update the last accessed timestamp."""
@@ -88,7 +105,9 @@ class RepositoryManager:
         self.default_repository: Optional[str] = None
 
         # Create config directory if it doesn't exist
-        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+        config_dir = os.path.dirname(config_path)
+        if config_dir:  # Only create if there's a directory component
+            os.makedirs(config_dir, exist_ok=True)
 
         # Load existing configuration
         self._load_config()
