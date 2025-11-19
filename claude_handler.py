@@ -28,26 +28,34 @@ class ClaudeHandler:
         # Set the API key in environment
         os.environ['ANTHROPIC_API_KEY'] = self.api_key
 
-    def send_prompt(self, prompt: str, timeout: int = 120) -> Tuple[bool, str, Optional[str]]:
+    def send_prompt(self, prompt: str, timeout: int = 120, working_dir: Optional[str] = None) -> Tuple[bool, str, Optional[str]]:
         """
         Send a prompt to Claude Code CLI and get the response.
 
         Args:
             prompt: The prompt to send to Claude
             timeout: Maximum time to wait for response (seconds)
+            working_dir: Directory to run Claude in (defaults to current directory)
 
         Returns:
             Tuple of (success, response_text, error_message)
         """
         try:
+            # Prepare environment with workspace context
+            env = os.environ.copy()
+
+            # Enhance prompt with workspace context
+            enhanced_prompt = self._build_workspace_prompt(prompt, working_dir or os.getcwd())
+
             # Run Claude Code with the prompt
             # Using -p flag to pass prompt directly
             result = subprocess.run(
-                ['claude', '-p', prompt],
+                ['claude', '-p', enhanced_prompt],
                 capture_output=True,
                 text=True,
                 timeout=timeout,
-                env=os.environ.copy()
+                cwd=working_dir,  # Run in the specified directory
+                env=env
             )
 
             if result.returncode == 0:
@@ -86,6 +94,35 @@ class ClaudeHandler:
         # For now, we include session context in the prompt
 
         return self.send_prompt(prompt, timeout)
+
+    def _build_workspace_prompt(self, user_prompt: str, working_dir: str) -> str:
+        """
+        Build an enhanced prompt with workspace context.
+
+        Args:
+            user_prompt: The user's original prompt
+            working_dir: Current working directory (repository path)
+
+        Returns:
+            Enhanced prompt with workspace context
+        """
+        # Check if we're in a git repository
+        is_git_repo = os.path.isdir(os.path.join(working_dir, '.git'))
+
+        context_parts = []
+
+        if is_git_repo:
+            context_parts.append(f"You are working in a git repository at: {working_dir}")
+            context_parts.append("You have full access to read, explore, and modify files in this codebase.")
+            context_parts.append("Use your file reading and editing tools to understand the code structure before making changes.")
+        else:
+            context_parts.append(f"You are working in directory: {working_dir}")
+            context_parts.append("You have access to read and modify files in this directory.")
+
+        context_parts.append("\nUser request:")
+        context_parts.append(user_prompt)
+
+        return "\n".join(context_parts)
 
     def check_claude_installed(self) -> bool:
         """
