@@ -49,12 +49,16 @@ class RepoAwareClaudeHandler(ClaudeHandler):
             os.chdir(repository.path)
             logger.info(f"Executing Claude in repository: {repository.name} at {repository.path}")
 
-            # Execute Claude Code CLI
+            # Build enhanced prompt with repository context
+            enhanced_prompt = self._build_repo_aware_prompt(prompt, repository)
+
+            # Execute Claude Code CLI with full workspace context
             result = subprocess.run(
-                ['claude', '-p', prompt],
+                ['claude', '-p', enhanced_prompt],
                 capture_output=True,
                 text=True,
                 timeout=timeout,
+                cwd=repository.path,  # Explicitly set working directory
                 env=self._prepare_env()
             )
 
@@ -81,6 +85,37 @@ class RepoAwareClaudeHandler(ClaudeHandler):
             # Always restore original directory
             os.chdir(original_cwd)
             logger.debug(f"Restored working directory to {original_cwd}")
+
+    def _build_repo_aware_prompt(self, user_prompt: str, repository: Repository) -> str:
+        """
+        Build an enhanced prompt with repository-specific context.
+
+        Args:
+            user_prompt: The user's original prompt
+            repository: Repository object with metadata
+
+        Returns:
+            Enhanced prompt with repository context
+        """
+        context_parts = []
+
+        context_parts.append(f"You are working in the '{repository.name}' repository.")
+        context_parts.append(f"Repository path: {repository.path}")
+
+        if repository.description:
+            context_parts.append(f"Repository description: {repository.description}")
+
+        context_parts.append("\nYou have full access to:")
+        context_parts.append("- Read any file in this codebase using your file reading tools")
+        context_parts.append("- Search for code patterns using grep/search tools")
+        context_parts.append("- Explore the directory structure")
+        context_parts.append("- Edit and create files as needed")
+        context_parts.append("\nIMPORTANT: Before making changes, use your tools to explore the codebase and understand the existing structure.")
+
+        context_parts.append("\nUser request:")
+        context_parts.append(user_prompt)
+
+        return "\n".join(context_parts)
 
     def _prepare_env(self) -> dict:
         """
