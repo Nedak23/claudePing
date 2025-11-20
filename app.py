@@ -9,14 +9,11 @@ from twilio.rest import Client
 from dotenv import load_dotenv
 import logging
 
-from claude_handler import ClaudeHandler, SessionManager
-from git_handler import GitHandler
+from claude_handler import ClaudeHandler
 from storage import ResponseStorage, SessionStorage
 from summary_generator import SummaryGenerator
-
-# Multi-repo support imports
 from repository_manager import RepositoryManager, Repository
-from enhanced_session_manager import EnhancedSessionManager
+from enhanced_session_manager import SessionManager
 from repo_aware_claude_handler import RepoAwareClaudeHandler
 from git_handler_factory import GitHandlerFactory
 from command_parser import CommandParser
@@ -34,42 +31,57 @@ logger = logging.getLogger(__name__)
 # Initialize Flask app
 app = Flask(__name__)
 
-# Check if multi-repo mode is enabled
-def is_multi_repo_enabled() -> bool:
-    """Check if multi-repo mode is enabled by presence of config file."""
-    return os.path.exists('config/repositories.json')
-
-
-# Initialize components
+# Initialize components - always multi-repo mode
 try:
-    claude_handler = ClaudeHandler()
+    # Check for required configuration
+    if not os.path.exists('config/repositories.json'):
+        logger.error("=" * 70)
+        logger.error("FATAL: Repository configuration not found")
+        logger.error("")
+        logger.error("ClaudePing requires config/repositories.json to operate.")
+        logger.error("")
+        logger.error("Create the configuration file with your repositories:")
+        logger.error("  1. Copy config/repositories.json.example")
+        logger.error("  2. Edit with your repository paths")
+        logger.error("  3. Restart the application")
+        logger.error("")
+        logger.error("See README.md for setup instructions.")
+        logger.error("=" * 70)
+        import sys
+        sys.exit(1)
+
+    # Initialize core components
     response_storage = ResponseStorage()
     session_storage = SessionStorage()
     summary_generator = SummaryGenerator()
+    repo_manager = RepositoryManager()
+    repo_claude_handler = RepoAwareClaudeHandler()
+    session_manager = SessionManager(repo_manager, repo_claude_handler, session_storage)
+    git_handler_factory = GitHandlerFactory()
+    command_parser = CommandParser()
 
-    # Multi-repo mode detection
-    MULTI_REPO_MODE = is_multi_repo_enabled()
+    # Validate all repositories are valid git repositories
+    invalid_repos = []
+    for repo in repo_manager.list_repositories():
+        if not repo.is_valid:
+            invalid_repos.append(f"  - {repo.name}: {repo.path} (not a valid git repository)")
 
-    if MULTI_REPO_MODE:
-        logger.info("Multi-repo mode ENABLED")
-        # Initialize multi-repo components
-        repo_manager = RepositoryManager()
-        repo_claude_handler = RepoAwareClaudeHandler()
-        session_manager = EnhancedSessionManager(claude_handler, repo_manager, repo_claude_handler)
-        git_handler_factory = GitHandlerFactory()
-        command_parser = CommandParser()
-
-        # Keep legacy git_handler for backward compatibility
-        git_handler = GitHandler()
-        logger.info(f"Loaded {len(repo_manager.repositories)} repositories")
-    else:
-        logger.info("Multi-repo mode DISABLED (using legacy single-repo mode)")
-        # Use legacy single-repo components
-        session_manager = SessionManager(claude_handler)
-        git_handler = GitHandler()
-        repo_manager = None
-        git_handler_factory = None
-        command_parser = None
+    if invalid_repos:
+        logger.error("=" * 70)
+        logger.error("FATAL: Invalid repositories detected")
+        logger.error("")
+        logger.error("The following repositories are not valid git repositories:")
+        for error in invalid_repos:
+            logger.error(error)
+        logger.error("")
+        logger.error("All registered repositories must:")
+        logger.error("  - Exist on the filesystem")
+        logger.error("  - Contain a .git directory")
+        logger.error("")
+        logger.error("Fix these issues in config/repositories.json and restart.")
+        logger.error("=" * 70)
+        import sys
+        sys.exit(1)
 
     # Initialize Twilio client
     twilio_client = Client(
@@ -77,7 +89,9 @@ try:
         os.getenv('TWILIO_AUTH_TOKEN')
     )
 
+    logger.info(f"Successfully loaded {len(repo_manager.repositories)} repositories")
     logger.info("All components initialized successfully")
+
 except Exception as e:
     logger.error(f"Failed to initialize components: {str(e)}")
     raise
@@ -133,11 +147,10 @@ def process_command(command: str, phone_number: str) -> str:
             message_count=message_count
         )
 
-        # Add active repository info if in multi-repo mode
-        if MULTI_REPO_MODE:
-            active_repo = session_manager.get_active_repository_name(phone_number)
-            if active_repo:
-                status_msg += f"\nActive repo: {active_repo}"
+        # Add active repository info
+        active_repo = session_manager.get_active_repository_name(phone_number)
+        if active_repo:
+            status_msg += f"\nActive repo: {active_repo}"
 
         return status_msg
 
@@ -159,7 +172,7 @@ def process_command(command: str, phone_number: str) -> str:
 
 def process_repo_command(intent, phone_number: str) -> str:
     """
-    Process repository management commands (multi-repo mode only).
+    Process repository management commands.
 
     Args:
         intent: CommandIntent object
@@ -168,9 +181,6 @@ def process_repo_command(intent, phone_number: str) -> str:
     Returns:
         Response message or None if not a repo command
     """
-    if not MULTI_REPO_MODE:
-        return None
-
     if intent.type == 'list_repos':
         repos = session_manager.list_accessible_repositories(phone_number)
         if not repos:
@@ -224,44 +234,28 @@ def handle_coding_request(message: str, phone_number: str, repository: Repositor
     Args:
         message: User's message/prompt
         phone_number: User's phone number
-        repository: Optional specific repository (for multi-repo mode)
+        repository: Optional specific repository (uses active if not provided)
 
     Returns:
         Response summary to send via SMS
     """
     try:
-        # Determine which repository to use
-        target_repo = repository
-        repo_name = None
+        # Get target repository (explicit or session default)
+        target_repo = repository or session_manager.get_active_repository(phone_number)
 
-        if MULTI_REPO_MODE and not target_repo:
-            # Get active repository from session
-            target_repo = session_manager.get_active_repository(phone_number)
-            if not target_repo:
-                return "No active repository. Send 'list repos' to see available repositories or 'switch to <repo>' to select one."
+        if not target_repo:
+            return "No repository selected. Send 'list repos' or 'switch to <repo>'."
 
-        if target_repo:
-            repo_name = target_repo.name
-            logger.info(f"Using repository: {repo_name}")
+        logger.info(f"Using repository: {target_repo.name}")
 
-        # Send to Claude Code
+        # Send to Claude Code (always repository-aware)
         logger.info(f"Sending prompt to Claude: {message[:50]}...")
-
-        if MULTI_REPO_MODE and target_repo:
-            # Use repository-aware execution
-            success, response, error = session_manager.send_message_to_repo(
-                phone_number,
-                message,
-                target_repo,
-                timeout=120
-            )
-        else:
-            # Legacy single-repo mode
-            success, response, error = session_manager.send_message(
-                phone_number,
-                message,
-                timeout=120
-            )
+        success, response, error = session_manager.send_message_to_repo(
+            phone_number,
+            message,
+            target_repo,
+            timeout=120
+        )
 
         if not success:
             logger.error(f"Claude request failed: {error}")
@@ -273,11 +267,8 @@ def handle_coding_request(message: str, phone_number: str, repository: Repositor
         branch_name = None
         files_changed = []
 
-        # Get appropriate git handler
-        if MULTI_REPO_MODE and target_repo:
-            git_h = git_handler_factory.get_handler(target_repo)
-        else:
-            git_h = git_handler
+        # Get git handler for this repository
+        git_h = git_handler_factory.get_handler(target_repo)
 
         if git_h.is_git_repo():
             files_changed = git_h.get_changed_files()
@@ -327,10 +318,8 @@ def handle_coding_request(message: str, phone_number: str, repository: Repositor
             base_url=base_url
         )
 
-        # Add repository context if in multi-repo mode
-        if MULTI_REPO_MODE and repo_name:
-            # Prepend repo name to summary
-            summary = f"[{repo_name}] {summary}"
+        # Prepend repo name to summary
+        summary = f"[{target_repo.name}] {summary}"
 
         logger.info(f"Generated summary: {summary}")
         return summary
@@ -367,51 +356,46 @@ def sms_webhook():
             resp.message("Please send a message with your coding request.")
             return str(resp)
 
-        # Check for special commands (legacy)
+        # Check for special commands
         command_response = process_command(message_body, from_number)
         if command_response:
             resp.message(command_response)
             return str(resp)
 
-        # Multi-repo mode: parse command intent
-        if MULTI_REPO_MODE:
-            intent = command_parser.parse(message_body)
-            logger.info(f"Parsed intent: {intent.type}, repo: {intent.repository}")
+        # Parse command intent
+        intent = command_parser.parse(message_body)
+        logger.info(f"Parsed intent: {intent.type}, repo: {intent.repository}")
 
-            # Handle repository management commands
-            if intent.type in ['list_repos', 'switch_repo', 'repo_info', 'repo_status']:
-                repo_response = process_repo_command(intent, from_number)
-                if repo_response:
-                    resp.message(repo_response)
-                    return str(resp)
-
-            # Handle inline repository targeting
-            elif intent.type == 'inline_repo':
-                target_repo = repo_manager.get_repository(intent.repository)
-                if not target_repo:
-                    resp.message(f"Repository '{intent.repository}' not found. Send 'list repos' to see available.")
-                    return str(resp)
-
-                # Validate access
-                is_allowed, error = repo_manager.validate_access(from_number, intent.repository, 'write')
-                if not is_allowed:
-                    resp.message(error)
-                    return str(resp)
-
-                # Process request in specific repository
-                response_message = handle_coding_request(intent.prompt, from_number, target_repo)
-                resp.message(response_message)
+        # Handle repository management commands
+        if intent.type in ['list_repos', 'switch_repo', 'repo_info', 'repo_status']:
+            repo_response = process_repo_command(intent, from_number)
+            if repo_response:
+                resp.message(repo_response)
                 return str(resp)
 
-            # Handle regular coding request (uses active repo)
-            elif intent.type == 'coding_request':
-                response_message = handle_coding_request(intent.prompt, from_number)
-                resp.message(response_message)
+        # Handle inline repository targeting
+        elif intent.type == 'inline_repo':
+            target_repo = repo_manager.get_repository(intent.repository)
+            if not target_repo:
+                resp.message(f"Repository '{intent.repository}' not found. Send 'list repos' to see available.")
                 return str(resp)
 
-        # Legacy single-repo mode: process as coding request
-        response_message = handle_coding_request(message_body, from_number)
-        resp.message(response_message)
+            # Validate access
+            is_allowed, error = repo_manager.validate_access(from_number, intent.repository, 'write')
+            if not is_allowed:
+                resp.message(error)
+                return str(resp)
+
+            # Process request in specific repository
+            response_message = handle_coding_request(intent.prompt, from_number, target_repo)
+            resp.message(response_message)
+            return str(resp)
+
+        # Handle regular coding request (uses active repo)
+        elif intent.type == 'coding_request':
+            response_message = handle_coding_request(intent.prompt, from_number)
+            resp.message(response_message)
+            return str(resp)
 
         return str(resp)
 
@@ -450,8 +434,9 @@ def health_check():
     """Health check endpoint."""
     status = {
         'status': 'healthy',
-        'claude_installed': claude_handler.check_claude_installed(),
-        'git_repo': git_handler.is_git_repo()
+        'claude_installed': repo_claude_handler.check_claude_installed(),
+        'repositories': len(repo_manager.repositories),
+        'valid_repos': sum(1 for r in repo_manager.list_repositories() if r.is_valid)
     }
 
     return jsonify(status)
@@ -475,7 +460,7 @@ def index():
 
 if __name__ == '__main__':
     # Verify Claude Code is installed
-    if not claude_handler.check_claude_installed():
+    if not repo_claude_handler.check_claude_installed():
         logger.warning("Claude Code CLI not detected. Please ensure it's installed.")
 
     # Get configuration

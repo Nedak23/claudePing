@@ -1,0 +1,29 @@
+{
+  "repositories": {
+    "my-project": {
+      "name": "my-project",
+      "path": "/absolute/path/to/your/repository",
+      "remote_url": "https://github.com/username/my-project",
+      "description": "My main project repository",
+      "created_at": "2025-01-19T00:00:00",
+      "last_accessed": "2025-01-19T00:00:00",
+      "access_control": {
+        "+1234567890": ["admin"],
+        "+0987654321": ["write"],
+        "+1112223333": ["read"]
+      }
+    },
+    "second-repo": {
+      "name": "second-repo",
+      "path": "/absolute/path/to/second/repository",
+      "remote_url": "https://github.com/username/second-repo",
+      "description": "Secondary repository for testing",
+      "created_at": "2025-01-19T00:00:00",
+      "last_accessed": "2025-01-19T00:00:00",
+      "access_control": {
+        "+1234567890": ["admin"]
+      }
+    }
+  },
+  "default_repository": "my-project"
+}

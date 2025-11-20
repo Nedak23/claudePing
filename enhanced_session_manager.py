@@ -1,51 +1,46 @@
 """
-Enhanced session manager with multi-repository support.
+Session manager with multi-repository support.
 """
 import logging
+import json
+import os
 from typing import Tuple, Optional, List, Dict
 from datetime import datetime
 
-from claude_handler import SessionManager, ClaudeHandler
 from repository_manager import RepositoryManager, Repository
 from repo_aware_claude_handler import RepoAwareClaudeHandler
+from storage import SessionStorage
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class EnhancedSessionManager(SessionManager):
+class SessionManager:
     """
-    Extends SessionManager with multi-repository capabilities.
+    Manages Claude conversation sessions with multi-repository support.
 
-    Tracks user's active repository and repository history in addition
-    to regular session management.
+    Tracks user's active repository with both in-memory cache and
+    persistent storage for session continuity.
     """
 
     def __init__(self,
-                 claude_handler: ClaudeHandler,
                  repo_manager: RepositoryManager,
-                 repo_claude_handler: Optional[RepoAwareClaudeHandler] = None):
+                 repo_claude_handler: RepoAwareClaudeHandler,
+                 session_storage: SessionStorage):
         """
-        Initialize the enhanced session manager.
+        Initialize the session manager.
 
         Args:
-            claude_handler: ClaudeHandler instance for base functionality
             repo_manager: RepositoryManager instance
-            repo_claude_handler: Optional RepoAwareClaudeHandler (will create if not provided)
+            repo_claude_handler: RepoAwareClaudeHandler instance
+            session_storage: SessionStorage instance for persistence
         """
-        super().__init__(claude_handler)
         self.repo_manager = repo_manager
+        self.repo_claude_handler = repo_claude_handler
+        self.session_storage = session_storage
 
-        # Create RepoAwareClaudeHandler if not provided
-        if repo_claude_handler is None:
-            api_key = getattr(claude_handler, 'api_key', None)
-            self.repo_claude_handler = RepoAwareClaudeHandler(api_key=api_key)
-        else:
-            self.repo_claude_handler = repo_claude_handler
-
-        # Track active repository per user (in-memory)
-        # This is in addition to persistent storage
+        # Track active repository per user (in-memory cache)
         self._active_repos: Dict[str, str] = {}
 
     def set_active_repository(self,
@@ -78,8 +73,11 @@ class EnhancedSessionManager(SessionManager):
         # Get previous active repo for message
         old_repo = self._active_repos.get(phone_number)
 
-        # Update active repository
+        # Update active repository in memory
         self._active_repos[phone_number] = repo_name
+
+        # Persist to session storage
+        self._persist_active_repo(phone_number, repo_name)
 
         logger.info(f"User {phone_number} switched to repository: {repo_name}")
 
@@ -95,6 +93,9 @@ class EnhancedSessionManager(SessionManager):
         """
         Get user's current active repository.
 
+        Checks in-memory cache first, then session storage, then falls back
+        to default repository.
+
         Args:
             phone_number: User's phone number
 
@@ -104,14 +105,22 @@ class EnhancedSessionManager(SessionManager):
         # Check in-memory cache first
         repo_name = self._active_repos.get(phone_number)
 
+        # If not in memory, check session storage
+        if not repo_name:
+            session = self.session_storage.get_session(phone_number)
+            repo_name = session.get('active_repository')
+
         if repo_name:
             repo = self.repo_manager.get_repository(repo_name)
             if repo:
+                # Cache it in memory for next time
+                self._active_repos[phone_number] = repo_name
                 return repo
             else:
                 # Cached repo no longer exists, clear it
                 logger.warning(f"Cached repository '{repo_name}' no longer exists for {phone_number}")
-                del self._active_repos[phone_number]
+                if phone_number in self._active_repos:
+                    del self._active_repos[phone_number]
 
         # Fall back to default repository
         default_repo = self.repo_manager.get_default_repository()
@@ -121,6 +130,7 @@ class EnhancedSessionManager(SessionManager):
             if is_allowed:
                 # Set as active for this user
                 self._active_repos[phone_number] = default_repo.name
+                self._persist_active_repo(phone_number, default_repo.name)
                 logger.info(f"Set default repository '{default_repo.name}' as active for {phone_number}")
                 return default_repo
             else:
@@ -174,6 +184,7 @@ class EnhancedSessionManager(SessionManager):
         # Update active repository if successful
         if success:
             self._active_repos[phone_number] = repository.name
+            self._persist_active_repo(phone_number, repository.name)
 
         return success, response, error
 
@@ -184,9 +195,6 @@ class EnhancedSessionManager(SessionManager):
                     timeout: int = 120) -> Tuple[bool, str, Optional[str]]:
         """
         Send a message in the context of a user's session.
-
-        This is an override of the base SessionManager.send_message that adds
-        repository awareness.
 
         Args:
             phone_number: User's phone number
@@ -205,8 +213,7 @@ class EnhancedSessionManager(SessionManager):
         else:
             repo = self.get_active_repository(phone_number)
             if not repo:
-                # Fall back to base implementation if no repos configured
-                return super().send_message(phone_number, message, timeout)
+                return False, "", "No repository selected. Send 'list repos' to see available repositories or 'switch to <repo>' to select one."
 
         # Send message to specific repository
         return self.send_message_to_repo(phone_number, message, repo, timeout)
@@ -230,11 +237,29 @@ class EnhancedSessionManager(SessionManager):
         Args:
             phone_number: User's phone number
         """
-        # Clear active repository
+        # Clear active repository from memory
         if phone_number in self._active_repos:
             del self._active_repos[phone_number]
 
-        # Call parent clear_session
-        super().clear_session(phone_number)
+        # Clear from persistent storage
+        self.session_storage.clear_session(phone_number)
 
         logger.info(f"Cleared session and repository context for {phone_number}")
+
+    def _persist_active_repo(self, phone_number: str, repo_name: str):
+        """
+        Persist active repository to session storage.
+
+        Args:
+            phone_number: User's phone number
+            repo_name: Repository name to persist
+        """
+        session = self.session_storage.get_session(phone_number)
+        session['active_repository'] = repo_name
+
+        # Update session file directly
+        session_file = self.session_storage.get_session_file(phone_number)
+        with open(session_file, 'w') as f:
+            json.dump(session, f, indent=2)
+
+        logger.debug(f"Persisted active repository '{repo_name}' for {phone_number}")
