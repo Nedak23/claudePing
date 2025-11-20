@@ -73,9 +73,40 @@ pip install -r requirements.txt
 
 # Create environment file
 cp .env.example .env
+
+# Create repository configuration (REQUIRED)
+cp config/repositories.json.example config/repositories.json
 ```
 
-#### 7. Configure `.env`
+#### 7. Configure Repositories (**NEW - REQUIRED**)
+
+ClaudePing now requires a repository configuration file. Edit `config/repositories.json`:
+
+```json
+{
+  "repositories": {
+    "my-project": {
+      "name": "my-project",
+      "path": "/absolute/path/to/your/git/repo",
+      "remote_url": "https://github.com/username/repo",
+      "description": "My main project",
+      "access_control": {
+        "+1234567890": ["admin"]
+      }
+    }
+  },
+  "default_repository": "my-project"
+}
+```
+
+**Important:**
+- **Path must be absolute** (e.g., `/Users/you/projects/myrepo`)
+- **Must be a valid git repository** (contains `.git` directory)
+- Add your phone number to `access_control` with appropriate permissions
+- Permissions: `admin` > `write` > `read`
+- The `default_repository` is used when you don't specify one
+
+#### 8. Configure `.env`
 
 Edit `.env` with your credentials:
 
@@ -105,8 +136,9 @@ BASE_URL=http://localhost:8000
 **Important:**
 - Use YOUR phone number for `WHITELISTED_NUMBERS` (the one you verified)
 - Include country code (e.g., +1 for US)
+- This phone number must also be in your repository's `access_control`
 
-#### 8. Install & Configure ngrok
+#### 9. Install & Configure ngrok
 
 **Mac:**
 ```bash
@@ -194,11 +226,26 @@ Full: https://your-server.com/response/20241115_143022_123456
 
 ### Special Commands
 
-ClaudePing supports special commands for session management:
-
+#### Session Management
 - `NEW SESSION` - Start fresh conversation
-- `STATUS` - Check current session info
+- `STATUS` - Check current session and active repository
 - `FULL <id>` - Get complete response
+
+#### Repository Management (**NEW**)
+- `list repos` - See all repositories you have access to
+- `switch to <repo>` - Change active repository
+- `in <repo>: <request>` - Send request to specific repository
+- `info <repo>` - View repository details
+- `repos status` - Check status of all repositories
+
+**Examples:**
+```
+list repos
+switch to my-api
+in frontend: add dark mode toggle
+```
+
+**Note:** The last repository you used is automatically remembered for your next request.
 
 **[View Complete Commands Guide →](COMMANDS.md)**
 

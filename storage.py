@@ -163,7 +163,8 @@ class SessionStorage:
             "created_at": datetime.now().isoformat(),
             "last_activity": datetime.now().isoformat(),
             "conversation_history": [],
-            "current_branch": None
+            "current_branch": None,
+            "active_repository": None
         }
 
     def update_session(self,

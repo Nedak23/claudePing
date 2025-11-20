@@ -38,11 +38,26 @@ class Repository:
 
     @property
     def is_valid(self) -> bool:
-        """Check if repository path exists and is a valid git repo."""
+        """
+        Check if repository path exists and is a valid git repository.
+
+        Returns:
+            True if valid, False otherwise
+        """
         if not os.path.exists(self.path):
+            logger.error(f"Repository path does not exist: {self.path}")
             return False
+
+        if not os.path.isabs(self.path):
+            logger.error(f"Repository path must be absolute: {self.path}")
+            return False
+
         git_dir = os.path.join(self.path, '.git')
-        return os.path.isdir(git_dir)
+        if not os.path.isdir(git_dir):
+            logger.error(f"Not a git repository (no .git directory): {self.path}")
+            return False
+
+        return True
 
     def has_access(self, phone_number: str, permission: str = 'read') -> bool:
         """
@@ -205,6 +220,10 @@ class RepositoryManager:
             description=description,
             access_control=access_control or {}
         )
+
+        # Validate repository before adding
+        if not repo.is_valid:
+            return False, f"Cannot register '{name}': not a valid git repository at {path}"
 
         # Add to registry
         self.repositories[name] = repo
