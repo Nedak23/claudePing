@@ -1,331 +1,211 @@
 # ClaudePing
 
-Send coding requests via **WhatsApp** and get AI-powered assistance from Claude on the go, with automatic Git branch creation and GitHub integration.
+**Code via WhatsApp** - Send coding requests via text message and get AI-powered assistance from Claude on the go, with automatic Git branch creation and GitHub integration.
 
-## Setup
+## What is ClaudePing?
 
-### Prerequisites
+ClaudePing lets you interact with Claude Code CLI through WhatsApp or SMS. Just text your coding requests and receive:
+- ✅ Automated code changes committed to git branches
+- ✅ Support for multiple repositories
+- ✅ Natural language commands
+- ✅ Full session context across conversations
+- ✅ Automatic GitHub integration
 
-- **Python 3.8+**
-- **Claude Code CLI** - [Install guide](https://docs.anthropic.com)
-- **Twilio Account** - For WhatsApp (free trial)
-- **Git & GitHub** - For code management
-- **ngrok** - For local development
+## Quick Start
 
-### Step-by-Step Setup
+1. **Get the prerequisites**: Twilio account, Claude Code CLI, Python 3.8+
+2. **Follow the [Setup Guide](docs/setup.md)** for step-by-step installation
+3. **Read the [Usage Guide](docs/usage_guide.md)** to learn commands
 
-#### 1. Create Twilio Account
-
-1. Go to https://www.twilio.com/try-twilio
-2. Sign up and verify your phone number
-
-#### 2. Join WhatsApp Sandbox
-
-1. In Twilio Console: **Messaging → Try it out → Send a WhatsApp message**
-2. Note the sandbox number (e.g., +1 415-523-8886)
-3. Open WhatsApp on your phone
-4. Send the join code to the sandbox number (displayed on page)
-5. Wait for confirmation: "✅ You are all set!"
-
-#### 3. Get Twilio Credentials
-
-From Twilio Console dashboard, copy:
-- **Account SID** (starts with "AC")
-- **Auth Token** (click "Show" to reveal)
-
-#### 4. Get Anthropic API Key
-
-1. Go to https://console.anthropic.com/
-2. Sign up/login and add payment method
-3. **Settings → API Keys → Create Key**
-4. Copy the key immediately (starts with "sk-ant-")
-
-#### 5. Install Claude Code CLI
-**Install**
-```bash
-brew install anthropics/tap/claude
-```
-
-**Configure:**
-```bash
-claude configure
-# Enter your Anthropic API key when prompted
-```
-
-**Verify:**
-```bash
-claude --version
-```
-
-#### 6. Setup Project
-
-```bash
-# Clone repository
-git clone <your-repo-url>
-cd claudePing
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Create environment file
-cp .env.example .env
-
-# Create repository configuration (REQUIRED)
-cp config/repositories.json.example config/repositories.json
-```
-
-#### 7. Configure Repositories (**NEW - REQUIRED**)
-
-ClaudePing now requires a repository configuration file. Edit `config/repositories.json`:
-
-```json
-{
-  "repositories": {
-    "my-project": {
-      "name": "my-project",
-      "path": "/absolute/path/to/your/git/repo",
-      "remote_url": "https://github.com/username/repo",
-      "description": "My main project",
-      "access_control": {
-        "+1234567890": ["admin"]
-      }
-    }
-  },
-  "default_repository": "my-project"
-}
-```
-
-**Important:**
-- **Path must be absolute** (e.g., `/Users/you/projects/myrepo`)
-- **Must be a valid git repository** (contains `.git` directory)
-- Add your phone number to `access_control` with appropriate permissions
-- Permissions: `admin` > `write` > `read`
-- The `default_repository` is used when you don't specify one
-
-#### 8. Configure `.env`
-
-Edit `.env` with your credentials:
-
-```env
-# Twilio Configuration
-TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-TWILIO_AUTH_TOKEN=your_auth_token_here
-
-# WhatsApp - leave blank for sandbox
-TWILIO_PHONE_NUMBER=
-
-# Your phone number (include country code, no spaces)
-WHITELISTED_NUMBERS=+1234567890
-
-# Claude API
-ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxx
-
-# GitHub (optional)
-GITHUB_TOKEN=
-
-# Server Config (defaults are fine)
-SERVER_PORT=8000
-SERVER_HOST=0.0.0.0
-BASE_URL=http://localhost:8000
-```
-
-**Important:**
-- Use YOUR phone number for `WHITELISTED_NUMBERS` (the one you verified)
-- Include country code (e.g., +1 for US)
-- This phone number must also be in your repository's `access_control`
-
-#### 9. Install & Configure ngrok
-
-**Mac:**
-```bash
-brew install ngrok
-```
-
-**Setup ngrok account:**
-1. Go to https://ngrok.com/ and sign up (free)
-2. Copy your auth token from https://dashboard.ngrok.com/get-started/your-authtoken
-3. Configure: `ngrok config add-authtoken YOUR_TOKEN_HERE`
-
-#### 9. Start Servers
-
-**Terminal 1 - Flask Server:**
-```bash
-cd claudePing
-source venv/bin/activate
-python app.py
-```
-
-**Terminal 2 - ngrok:**
-```bash
-ngrok http 5000
-```
-
-Copy the **HTTPS forwarding URL** from ngrok (e.g., `https://abcd-1234.ngrok-free.app`)
-
-#### 10. Configure Webhook
-
-1. Edit `.env` and update `BASE_URL` with your ngrok URL
-2. Go to Twilio Console: **Messaging → Try it out → Send a WhatsApp message**
-3. Scroll to "Sandbox Configuration"
-4. In "When a message comes in": Enter `https://your-ngrok-url.ngrok-free.app/sms`
-5. Method: **HTTP POST**
-6. Click **Save**
-
-**Note:** The endpoint is `/sms`
-
-#### 11. Test It! 🎉
-
-Send a WhatsApp message to the sandbox number:
-```
-Create a Python function that adds two numbers
-```
-
-You should receive a response within 30-60 seconds with:
-- A summary of what was done
-- Branch name created
-- Link to full response
-
-**Success!** You're now coding via WhatsApp! 🚀
-
----
-
-## Usage
-
-### Send Coding Requests
-
-Just message naturally in WhatsApp:
+## Example Usage
 
 ```
-Create a Python function to calculate fibonacci numbers
-```
+You: Create a Python function that calculates fibonacci numbers
 
-```
-Add error handling to the add_numbers function
-```
-
-```
-Write unit tests for my authentication module
-```
-
-```
-Refactor the database connection to use connection pooling
-```
-
-### Response Format
-
-You'll receive:
-```
-✓ Done! Modified 1 file. Branch: sms/20241115_143022.
+ClaudePing: ✓ Done! Modified 1 file. Branch: sms/20241115_143022.
 Summary: Created fibonacci function with memoization...
-Full: https://your-server.com/response/20241115_143022_123456
+Full: https://your-server.com/response/123456
 ```
 
-### Special Commands
-
-#### Session Management
-- `NEW SESSION` - Start fresh conversation
-- `STATUS` - Check current session and active repository
-- `FULL <id>` - Get complete response
-
-#### Repository Management (**NEW**)
-- `list repos` - See all repositories you have access to
-- `switch to <repo>` - Change active repository
-- `in <repo>: <request>` - Send request to specific repository
-- `info <repo>` - View repository details
-- `repos status` - Check status of all repositories
-
-**Examples:**
 ```
-list repos
-switch to my-api
-in frontend: add dark mode toggle
+You: list repos
+
+ClaudePing: You have 3 repos:
+- my-api (active)
+- web-frontend
+- mobile-app
 ```
 
-**Note:** The last repository you used is automatically remembered for your next request.
+```
+You: in web-frontend: add dark mode toggle
 
-**[View Complete Commands Guide →](COMMANDS.md)**
+ClaudePing: [web-frontend] ✓ Done! Added dark mode toggle...
+```
+
+## Key Features
+
+### Multi-Repository Support
+- Manage multiple projects from one ClaudePing instance
+- Switch between repos with simple commands
+- Per-repository access control
+- Inline repo targeting: `in my-api: add feature`
+
+### Git Integration
+- Automatic branch creation for each request
+- Commits with descriptive messages
+- Push to GitHub automatically
+- Branch naming: `sms/YYYYMMDD_HHMMSS`
+
+### Session Management
+- Persistent conversation context
+- Start new sessions anytime
+- Remembers your active repository
+- Full response history
+
+### Access Control
+- Whitelist trusted phone numbers
+- Per-repository permissions (read/write/admin)
+- Multiple users supported
+- Secure credential management
 
 ## Project Structure
 
 ```
 claudePing/
-├── app.py                  # Main Flask application
-├── claude_handler.py       # Claude Code CLI integration
-├── git_handler.py          # Git operations (branch, commit, push)
-├── storage.py              # Response and session storage
-├── summary_generator.py    # Message summary generation
-├── requirements.txt        # Python dependencies
-├── .env                    # Environment variables (create from .env.example)
-├── README.md               # This file
-├── COMMANDS.md             # Complete commands reference
-├── responses/              # Stored full responses (JSON)
-├── sessions/               # User session data
-└── tests/
-    └── test_local.py       # Local testing utilities
+├── app.py                      # Main Flask application
+├── claude_handler.py           # Claude Code CLI integration
+├── git_handler.py              # Git operations
+├── repository_manager.py       # Multi-repo support
+├── enhanced_session_manager.py # Session & context tracking
+├── command_parser.py           # Command interpretation
+├── storage.py                  # Response storage
+├── repo_admin.py              # Repository admin CLI tool
+├── config/
+│   └── repositories.json       # Repository configuration
+├── docs/
+│   ├── setup.md               # Installation guide
+│   └── usage_guide.md         # Commands and usage
+└── requirements.txt           # Python dependencies
 ```
 
-### Adding Multiple Users
+## Documentation
 
-Add multiple phone numbers to `.env`:
-```env
-WHITELISTED_NUMBERS=+12345678901,+10987654321,+15555555555
+- **[Setup Guide](docs/setup.md)** - Complete installation and configuration instructions
+- **[Usage Guide](docs/usage_guide.md)** - All commands, examples, and troubleshooting
+- **[Multi-Repo Guide](docs/MULTI_REPO_GUIDE.md)** - Detailed multi-repository documentation
+
+## Requirements
+
+- Python 3.8+
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/build-with-claude/claude-code)
+- [Twilio Account](https://www.twilio.com/try-twilio) (free trial available)
+- Git & GitHub account
+- ngrok (for local development)
+
+## Quick Example Commands
+
+### Repository Management
+```
+list repos              # View all repositories
+switch to my-api       # Change active repository
+info my-api            # Show repository details
+repos status           # Check status of all repos
 ```
 
-Each person must:
-1. Join the Twilio WhatsApp sandbox (send join code)
-2. Have their number added to the whitelist
-
-### Timeout Settings
-
-Adjust Claude timeout in `claude_handler.py`:
-```python
-def send_prompt(self, prompt: str, timeout: int = 120):
+### Coding Requests
+```
+Create a login API endpoint
+Add error handling to the payment function
+Write unit tests for authentication
+Refactor database connection to use pooling
 ```
 
-### Summary Length
-
-Adjust in `summary_generator.py`:
-```python
-def __init__(self, max_length: int = 150):
+### Session Commands
+```
+STATUS           # Check current session and repo
+NEW SESSION      # Start fresh conversation
+FULL <id>        # Get complete response
 ```
 
----
+## Repository Admin CLI
 
-## Daily Usage
+Manage repositories easily with the `repo_admin.py` tool:
 
-### Starting Your Session
-
-Every time you want to use the system:
-
-**Terminal 1:**
 ```bash
-cd ~/Projects/claudePing
-source venv/bin/activate
-python app.py
+# Register a repository
+python repo_admin.py register my-project /path/to/repo --admin-phone +1234567890
+
+# Auto-discover repos
+python repo_admin.py discover ~/projects --auto-register
+
+# List repositories
+python repo_admin.py list --verbose
+
+# Grant access to users
+python repo_admin.py grant my-project +9876543210 --level write
+
+# Validate configuration
+python repo_admin.py validate
 ```
 
-**Terminal 2:**
-```bash
-ngrok http 8000
-```
+See `python repo_admin.py --help` for all commands.
 
-### Stopping the System
+## Architecture
 
-1. Press `Ctrl+C` in both terminals
-2. Deactivate venv: `deactivate`
+ClaudePing consists of several components working together:
+
+1. **Flask Server** - Receives webhooks from Twilio
+2. **Claude Handler** - Executes Claude Code CLI commands
+3. **Git Handler** - Manages git operations per repository
+4. **Repository Manager** - Central registry for multiple repos
+5. **Session Manager** - Tracks user context and active repositories
+6. **Command Parser** - Interprets user intent and repository targeting
+7. **Storage** - Persists responses and session data
 
 ## Contributing
 
-This is a personal MVP project. Feedback and suggestions welcome!
+This is a personal project built as an MVP. Feedback, suggestions, and contributions are welcome!
 
----
+### Development Setup
+
+```bash
+git clone <your-repo-url>
+cd claudePing
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+Follow the [Setup Guide](docs/setup.md) for full configuration.
+
+## Troubleshooting
+
+Common issues and solutions are documented in the [Usage Guide](docs/usage_guide.md#troubleshooting).
+
+Quick checks:
+```bash
+# Verify repositories are configured
+python repo_admin.py validate
+
+# Check Claude Code CLI
+claude --version
+
+# View application logs
+tail -f claudeping.log
+```
 
 ## License
 
 MIT License - feel free to use and modify for your needs.
 
+## Credits
+
+Built with:
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/build-with-claude/claude-code) by Anthropic
+- [Twilio API](https://www.twilio.com/) for WhatsApp/SMS
+- [Flask](https://flask.palletsprojects.com/) for web server
+- [ngrok](https://ngrok.com/) for local development tunneling
+
 ---
+
+**Ready to code via text?** Start with the [Setup Guide](docs/setup.md)! 🚀
